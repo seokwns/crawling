@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer" />
+    <title>뉴스 크롤링</title>
+    <link type="text/css" th:href="@{../static/css/main.css}" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="text/javascript" th:src="@{../static/scripts/main.js}"></script>
+</head>
+<body>
+<div class="main-container">
+    <nav id="navigation">
+        <a class="menu-link" href="/">뉴스 크롤링</a>
+        <div id="left-items">
+            <a class="menu-link" href="/keyword">키워드 관리</a>
+        </div>
+    </nav>
+    <h2 class="main-title">키워드 목록</h2>
+
+    <!-- 키워드 추가 입력 폼 -->
+    <div class="add-keyword">
+        <input type="text" id="keyword-input" placeholder="키워드를 입력하세요" />
+        <button id="add-keyword-btn">추가</button>
+    </div>
+
+    <!-- 키워드 목록을 보여주는 컨테이너 -->
+    <div class="search-container" id="search-container">
+        <!-- 키워드 항목들이 여기에 동적으로 추가될 것입니다 -->
+    </div>
+
+    <div id="loading" style="display:none;">Loading...</div> <!-- 로딩 메시지 -->
+</div>
+
+<script>
+    // 키워드 추가 함수
+    function addKeyword(keyword) {
+        fetch('http://localhost:8081/crawling/keyword', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ keyword: keyword }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Keyword added:', data);
+                loadKeywords();  // 키워드 목록을 새로고침
+            })
+            .catch(error => {
+                console.error('Error adding keyword:', error);
+            });
+    }
+
+    // 키워드 삭제 함수
+    function deleteKeyword(keyword) {
+        fetch('http://localhost:8081/crawling/keyword', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ keyword: keyword }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Keyword deleted:', data);
+                loadKeywords();  // 키워드 목록을 새로고침
+            })
+            .catch(error => {
+                console.error('Error deleting keyword:', error);
+            });
+    }
+
+    // 키워드 목록을 불러오는 함수
+    function loadKeywords() {
+        fetch('http://localhost:8081/crawling/keywords')
+            .then(response => response.json())
+            .then(data => {
+                const searchContainer = document.getElementById('search-container');
+                searchContainer.innerHTML = ''; // 기존 목록을 비우고 새로 고침
+
+                data.forEach(keyword => {
+                    const itemElement = document.createElement('div');
+                    itemElement.classList.add('search-result');
+                    itemElement.innerHTML = `
+                        <div class="post-content">
+                            <p class="advertisement">키워드: ${keyword}</p>
+                            <button class="delete-btn" onclick="deleteKeyword('${keyword}')">삭제</button>
+                        </div>
+                    `;
+                    searchContainer.appendChild(itemElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading keywords:', error);
+            });
+    }
+
+    // 키워드 추가 버튼 클릭 이벤트 처리
+    document.getElementById('add-keyword-btn').addEventListener('click', () => {
+        const keywordInput = document.getElementById('keyword-input');
+        const keyword = keywordInput.value.trim();
+        if (keyword) {
+            addKeyword(keyword);
+            keywordInput.value = '';  // 입력 필드 초기화
+        } else {
+            alert('키워드를 입력하세요!');
+        }
+    });
+
+    // 페이지 로드 시 키워드 목록 불러오기
+    loadKeywords();
+</script>
+</body>
+</html>

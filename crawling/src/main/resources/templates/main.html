@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer" />
+    <title>뉴스 크롤링</title>
+    <link type="text/css" th:href="@{../static/css/main.css}" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="text/javascript" th:src="@{../static/scripts/main.js}"></script>
+</head>
+<body>
+<div class="main-container">
+    <nav id="navigation">
+        <a class="menu-link" href="/">뉴스 크롤링</a>
+        <div id="left-items">
+            <a class="menu-link" href="/keyword">키워드 관리</a>
+        </div>
+    </nav>
+    <h2 class="main-title">뉴스 크롤링</h2>
+    <p id="notice">뉴스를 크롤링해보자</p>
+    <!-- 다운로드 버튼 -->
+    <div class="download-container">
+        <button id="download-btn">선택한 항목 다운로드 (CSV)</button>
+    </div>
+
+    <div class="search-container" id="search-container">
+        <!-- 뉴스 항목들이 여기에 동적으로 추가될 것입니다 -->
+    </div>
+
+    <div id="loading" style="display:none;">Loading...</div> <!-- 로딩 메시지 -->
+</div>
+
+<script>
+    let offset = 0;  // 현재 offset
+    const limit = 10;  // 한 번에 가져올 항목 수
+    let end = false;
+    let isLoading = false;  // 데이터를 로드 중인지 여부
+
+    // 페이지 로드 시 첫 번째 요청
+    document.addEventListener("DOMContentLoaded", function() {
+        loadMoreData();
+    });
+
+    // 스크롤 이벤트 리스너
+    window.addEventListener('scroll', function() {
+        if (isLoading) return;  // 이미 로딩 중이라면 요청을 보내지 않음
+        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 100) {
+            if (!end) loadMoreData();  // 페이지 하단에 가까워지면 데이터 로드
+        }
+    });
+
+    // 데이터를 더 로드하는 함수
+    function loadMoreData() {
+        isLoading = true;  // 로딩 시작
+        document.getElementById('loading').style.display = 'block';  // 로딩 메시지 표시
+
+        // API 요청
+        fetch(`http://localhost:8081/crawling?offset=${offset}&limit=${limit}`)
+            .then(response => response.json())
+            .then(data => {
+                const searchContainer = document.getElementById('search-container');
+                if (data.contents.length === 0) {
+                    end = true;
+                    isLoading = false;  // 로딩 종료
+                    document.getElementById('loading').style.display = 'none';  // 로딩 메시지 숨김
+                    return;
+                }
+                data.contents.forEach(newsItem => {
+                    const itemElement = document.createElement('div');
+                    itemElement.classList.add('search-result');
+
+                    const date = new Date(newsItem.date);
+                    const formattedDate = date.toLocaleString('ko-KR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false  // 24시간 포맷
+                    });
+
+                    itemElement.innerHTML = `
+                        <div class="post-content">
+                            <input type="checkbox" class="select-checkbox" data-keyword="${newsItem.keyword}" data-date="${formattedDate}" data-title="${newsItem.title}" data-description="${newsItem.description}" data-link="${newsItem.link}">
+                            <p class="date" style="margin-bottom: 20px">${formattedDate}</p>
+                            <p class="advertisement" style="margin-bottom: 20px">${newsItem.keyword}</p>
+                            <h3 class="post-title"><a href="${newsItem.link}" target="_blank">${newsItem.title}</a></h3>
+                            <p class="description">${newsItem.description}</p>
+                        </div>
+                    `;
+                    searchContainer.appendChild(itemElement);
+                });
+
+                offset += limit;  // offset 업데이트
+                isLoading = false;  // 로딩 종료
+                document.getElementById('loading').style.display = 'none';  // 로딩 메시지 숨김
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+                isLoading = false;  // 로딩 종료
+                document.getElementById('loading').style.display = 'none';  // 로딩 메시지 숨김
+            });
+    }
+
+    // CSV 다운로드 함수
+    function downloadCSV() {
+        const selectedItems = document.querySelectorAll('.select-checkbox:checked');
+        const data = [];
+
+        selectedItems.forEach(item => {
+            const keyword = item.getAttribute('data-keyword');
+            const date = item.getAttribute('data-date');
+            const title = item.getAttribute('data-title');
+            const description = item.getAttribute('data-description');
+            const link = item.getAttribute('data-link');
+
+            data.push({ keyword, date, title, description, link });
+        });
+
+        if (data.length === 0) {
+            alert("선택된 항목이 없습니다.");
+            return;
+        }
+
+        const csvContent = [
+            ["Keyword", "Date", "Title", "Description", "Link"], // CSV 헤더
+            ...data.map(item => [item.keyword, item.date, item.title, item.description, item.link])
+        ]
+            .map(row => row.join(","))
+            .join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "news_keywords.csv";
+        link.click();
+    }
+
+    // 다운로드 버튼 클릭 이벤트
+    document.getElementById('download-btn').addEventListener('click', downloadCSV);
+</script>
+</body>
+</html>
